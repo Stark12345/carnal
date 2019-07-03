@@ -1,0 +1,238 @@
+//Conexion
+
+using System.Data.SqlClient;
+
+namespace Capa_Datos
+{    public class Conexion
+    {   private SqlConnection con;
+        public SqlConnection Conectar()
+        {    try
+            {   string cadena = "Data Source=localhost;Initial Catalog=UNIVERSIDAD;Integrated Security=true";
+                con= new SqlConnection(cadena);
+                con.Open();
+                return con;
+            }
+            catch (SqlException ex)
+            { return null; }
+        }
+        public void Desconectar()
+        { con.Close();
+        }
+    }
+}   
+
+// d_paciente
+
+using Capa_Entidad;
+using System.Data.SqlClient;
+
+namespace Capa_Datos
+{    public class dPaciente
+    {   Conexion objConexion = new Conexion();
+        public string Insertar(ePaciente obj)
+        {   try
+            {   SqlConnection con = objConexion.Conectar();
+                string sql = string.Format("insert into Pacientes (nombre,hemoglobina) values ('{0}',{1})",
+                                                                                     obj.nom, obj.hem);
+                SqlCommand cmd = new SqlCommand(sql, con);
+                cmd.ExecuteNonQuery();
+                return "Registro correctamente un paciente";
+            }
+            catch (SqlException ex)
+            {     return "Error" + ex.Message;
+            }
+            finally
+            {    objConexion.Desconectar();
+            }
+        }
+
+        public string Modificar(ePaciente obj)
+        {
+            try
+            {
+                SqlConnection con = objConexion.Conectar();
+                string sql = string.Format("update Pacientes set nombre='{0}', hemoglobina={1} where id={2}",
+                                                                                      obj.nom, obj.hem,obj.cod);
+                SqlCommand cmd = new SqlCommand(sql, con);
+                cmd.ExecuteNonQuery();
+                return "Modifico correctamente un paciente";
+            }
+            catch (SqlException ex)
+            {
+                return "Error" + ex.Message;
+            }
+            finally
+            {
+                objConexion.Desconectar();
+            }
+        }
+
+        public string Eliminar(ePaciente obj)
+        {
+            try
+            {
+                SqlConnection con = objConexion.Conectar();
+                string sql = string.Format("delete from Pacientes where id={0}",obj.cod);
+                SqlCommand cmd = new SqlCommand(sql, con);
+                cmd.ExecuteNonQuery();
+                return "Elimino correctamente un paciente";
+            }
+            catch (SqlException ex)
+            {
+                return "Error" + ex.Message;
+            }
+            finally
+            {
+                objConexion.Desconectar();
+            }
+        }
+
+        public List<ePaciente> Listar()
+        {   try
+            {   List<ePaciente> listado = new List<ePaciente>();
+                ePaciente obj = null;
+                SqlConnection con = objConexion.Conectar();
+                string sql = string.Format("select * from Pacientes");
+                SqlCommand cmd = new SqlCommand(sql, con);
+                SqlDataReader reader=cmd.ExecuteReader();
+                while (reader.Read())
+                {   obj = new ePaciente();
+                    obj.cod = (int)reader["id"]; 
+                    obj.nom = (string)reader["nombre"];
+                    obj.hem = (decimal)reader["hemoglobina"]; 
+                    listado.Add(obj);
+                }
+                reader.Close();
+                return listado;
+            }
+            catch (SqlException ex)
+            {      return null;
+            }
+            finally
+            {      objConexion.Desconectar();
+            }
+        }
+    }
+}
+
+// negocio
+
+using Capa_Datos;
+using Capa_Entidad;
+
+namespace Capa_Negocios
+{
+    public class nPaciente
+    {
+        dPaciente objd = new dPaciente();
+        public string Insertar(ePaciente obje)
+        {    return objd.Insertar(obje);
+        }
+        public string Modificar(ePaciente obje)
+        {    return objd.Modificar(obje);
+        }
+        public string Eliminar(ePaciente obje)
+        {    return objd.Eliminar(obje);
+        }
+        public List<ePaciente> Listar()
+        {    return objd.Listar();
+        }
+    }
+}
+
+// presentacion
+
+using Capa_Entidad;
+using Capa_Negocios;
+
+namespace Capa_Presentacion
+{
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        public MainWindow()
+        {
+            InitializeComponent();
+            Mostrar();
+        }
+        // para poder llamar a las funciones de  capa negocios
+        nPaciente objn = new nPaciente(); 
+        // para poder saber que paciente se modificara o eliminara
+        ePaciente PacienteSeleccionado;
+       
+        // sirve para refrescar los datos de la tabla Pacientes en el data grid
+        void Mostrar()
+        {
+            dgPacientes.ItemsSource = objn.Listar();
+        }
+        private void btnInsertar_Click(object sender, RoutedEventArgs e)
+        {
+            if (txtNombre.Text != string.Empty || txtHemoglobina.Text != string.Empty)
+            {
+                ePaciente obje = new ePaciente();
+                obje.nom = txtNombre.Text;
+                obje.hem = Convert.ToDecimal(txtHemoglobina.Text);
+                MessageBox.Show(objn.Insertar(obje));
+                Mostrar();
+                txtNombre.Text = string.Empty;
+                txtHemoglobina.Text = string.Empty;
+               
+            }
+            else
+            {
+                MessageBox.Show("Debe llenar todos los Campos");
+            }
+        }
+
+        private void btnModificar_Click(object sender, RoutedEventArgs e)
+        {
+            PacienteSeleccionado = dgPacientes.SelectedItem as ePaciente;
+            if (PacienteSeleccionado != null)
+            {
+                ePaciente obje = new ePaciente();
+                obje.cod = PacienteSeleccionado.cod;
+                obje.nom = txtNombre.Text;
+                obje.hem = Convert.ToDecimal(txtHemoglobina.Text);
+                MessageBox.Show(objn.Modificar(obje));
+                Mostrar();
+                txtNombre.Text = string.Empty;
+                txtHemoglobina.Text = string.Empty;
+            }
+            else
+            {
+                MessageBox.Show("Seleccione un Paciente a Modificar de la Lista");
+            }
+        }
+
+        private void dataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            PacienteSeleccionado = dgPacientes.SelectedItem as ePaciente;
+            if (PacienteSeleccionado != null)
+            {
+                txtNombre.Text = PacienteSeleccionado.nom;
+                txtHemoglobina.Text = PacienteSeleccionado.hem.ToString();
+            }
+
+        }
+
+       
+
+        private void btnEliminar_Click(object sender, RoutedEventArgs e)
+        {
+            PacienteSeleccionado = dgPacientes.SelectedItem as ePaciente;
+            if (PacienteSeleccionado != null)
+            {
+                MessageBox.Show(objn.Eliminar(PacienteSeleccionado));
+                Mostrar();
+                txtNombre.Text = string.Empty;
+                txtHemoglobina.Text = string.Empty;
+            }
+            else
+            {
+                MessageBox.Show("Seleccione un Paciente a Eliminar de la Lista");
+            }
+        }
+    }
+}
